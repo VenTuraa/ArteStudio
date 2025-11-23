@@ -5,12 +5,15 @@ using UnityEngine;
 
 public class SC_GameLogic : MonoBehaviour
 {
+    [SerializeField] private Transform poolParent;
+    
     private Dictionary<string, GameObject> unityObjects;
     private int score = 0;
     private float displayScore = 0;
     private GameBoard gameBoard;
     private GlobalEnums.GameState currentState = GlobalEnums.GameState.move;
     private IMatchPreventionStrategy matchPrevention;
+    private GemPool gemPool;
     public GlobalEnums.GameState CurrentState { get { return currentState; } }
 
     #region MonoBehaviour
@@ -41,6 +44,17 @@ public class SC_GameLogic : MonoBehaviour
 
         gameBoard = new GameBoard(7, 7);
         matchPrevention = new GemMatchPrevention();
+        
+    
+        gemPool = new GemPool(poolParent.transform, 50);
+        
+        gemPool.WarmPool(SC_GameVariables.Instance.gems, 5);
+        if (SC_GameVariables.Instance.bomb != null)
+        {
+            SC_Gem[] bombArray = { SC_GameVariables.Instance.bomb };
+            gemPool.WarmPool(bombArray, 2);
+        }
+        
         Setup();
     }
     private void Setup()
@@ -73,8 +87,8 @@ public class SC_GameLogic : MonoBehaviour
         if (Random.Range(0, 100f) < SC_GameVariables.Instance.bombChance)
             _GemToSpawn = SC_GameVariables.Instance.bomb;
 
-        SC_Gem _gem = Instantiate(_GemToSpawn, new Vector3(_Position.x, _Position.y + SC_GameVariables.Instance.dropHeight, 0f), Quaternion.identity);
-        _gem.transform.SetParent(unityObjects["GemsHolder"].transform);
+        Vector3 spawnPosition = new Vector3(_Position.x, _Position.y + SC_GameVariables.Instance.dropHeight, 0f);
+        SC_Gem _gem = gemPool.GetGem(_GemToSpawn, spawnPosition, unityObjects["GemsHolder"].transform);
         _gem.name = "Gem - " + _Position.x + ", " + _Position.y;
         gameBoard.SetGem(_Position.x,_Position.y, _gem);
         _gem.SetupGem(this,_Position);
@@ -106,6 +120,7 @@ public class SC_GameLogic : MonoBehaviour
     {
         yield return new WaitForSeconds(.2f);
 
+        // Process each column separately for cascading effect
         for (int x = 0; x < gameBoard.Width; x++)
         {
             yield return StartCoroutine(CascadeColumnCo(x));
@@ -114,11 +129,18 @@ public class SC_GameLogic : MonoBehaviour
         StartCoroutine(FilledBoardCo());
     }
 
+    /// <summary>
+    /// Cascades gems in a single column one by one from bottom to top.
+    /// This ensures gems drop individually rather than as a group.
+    /// Also spawns new gems at the top that cascade down with existing gems.
+    /// </summary>
     private IEnumerator CascadeColumnCo(int column)
     {
+        // First pass: Calculate how far each gem needs to drop
         List<GemDropInfo> dropQueue = new List<GemDropInfo>();
         int nullCounter = 0;
 
+        // Process from bottom to top
         for (int y = 0; y < gameBoard.Height; y++)
         {
             SC_Gem currentGem = gameBoard.GetGem(column, y);
@@ -128,6 +150,7 @@ public class SC_GameLogic : MonoBehaviour
             }
             else if (nullCounter > 0)
             {
+                // This gem needs to drop
                 int targetY = y - nullCounter;
                 dropQueue.Add(new GemDropInfo
                 {
@@ -138,30 +161,34 @@ public class SC_GameLogic : MonoBehaviour
             }
         }
 
+        // Spawn new gems at the top for empty slots and add them to the drop queue
         for (int i = 0; i < nullCounter; i++)
         {
-            int targetY = gameBoard.Height - nullCounter + i;
-            int spawnY = gameBoard.Height + i;
+            int targetY = gameBoard.Height - nullCounter + i; // Target position after cascade
+            int spawnY = gameBoard.Height + i; // Spawn above the board (for visual cascading)
 
+            // Use match prevention to avoid unintended matches
             SC_Gem safeGem = matchPrevention.GetSafeGemType(
                 gameBoard,
-                new Vector2Int(column, targetY),
+                new Vector2Int(column, targetY), // Check at target position, not spawn position
                 SC_GameVariables.Instance.gems
             );
 
+            // Fallback to random if prevention returns null
             if (!safeGem)
             {
                 safeGem = SC_GameVariables.Instance.gems[Random.Range(0, SC_GameVariables.Instance.gems.Length)];
             }
 
-            SC_Gem newGem = Instantiate(safeGem, 
-                new Vector3(column, spawnY + SC_GameVariables.Instance.dropHeight, 0f), 
-                Quaternion.identity);
-            newGem.transform.SetParent(unityObjects["GemsHolder"].transform);
+            // Spawn gem above the board - it will cascade down visually
+            Vector3 spawnPosition = new Vector3(column, spawnY + SC_GameVariables.Instance.dropHeight, 0f);
+            SC_Gem newGem = gemPool.GetGem(safeGem, spawnPosition, unityObjects["GemsHolder"].transform);
             newGem.name = "Gem - " + column + ", " + targetY;
             
+            // Set initial position above board, gem will animate to target position
             newGem.SetupGem(this, new Vector2Int(column, spawnY));
 
+            // Add to drop queue - it will cascade down with other gems
             dropQueue.Add(new GemDropInfo
             {
                 gem = newGem,
@@ -170,23 +197,34 @@ public class SC_GameLogic : MonoBehaviour
             });
         }
 
+        // Second pass: Execute drops one by one from bottom to top
+        // This creates the cascading visual effect (bottom gems drop first)
         for (int i = 0; i < dropQueue.Count; i++)
         {
             GemDropInfo dropInfo = dropQueue[i];
             
+            // Update gem's target position - it will animate there
             dropInfo.gem.posIndex.y = dropInfo.targetY;
             
+            // Register gem at target position in gameBoard
             SetGem(column, dropInfo.targetY, dropInfo.gem);
             
+            // Clear source position if it's within board bounds (existing gems)
+            // Newly spawned gems above the board don't need clearing
             if (dropInfo.sourceY < gameBoard.Height)
             {
                 SetGem(column, dropInfo.sourceY, null);
             }
 
+            // Wait for gem to start moving before dropping the next one
+            // This creates the cascading effect where gems fall one by one
             yield return new WaitForSeconds(0.1f);
         }
     }
 
+    /// <summary>
+    /// Helper struct to track gem drop information.
+    /// </summary>
     private struct GemDropInfo
     {
         public SC_Gem gem;
@@ -205,14 +243,16 @@ public class SC_GameLogic : MonoBehaviour
         {
             Instantiate(_curGem.destroyEffect, new Vector2(_Pos.x, _Pos.y), Quaternion.identity);
 
-            Destroy(_curGem.gameObject);
             SetGem(_Pos.x,_Pos.y, null);
+            gemPool.ReturnToPool(_curGem);
         }
     }
 
     private IEnumerator FilledBoardCo()
     {
         yield return new WaitForSeconds(0.5f);
+        // RefillBoard is no longer needed - gems are spawned during cascading
+        // But we still need to check for misplaced gems
         CheckMisplacedGems();
         yield return new WaitForSeconds(0.5f);
         gameBoard.FindAllMatches();
@@ -242,7 +282,7 @@ public class SC_GameLogic : MonoBehaviour
         }
 
         foreach (SC_Gem g in foundGems)
-            Destroy(g.gameObject);
+            gemPool.ReturnToPool(g);
     }
     public void FindAllMatches()
     {

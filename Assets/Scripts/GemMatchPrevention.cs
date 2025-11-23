@@ -13,16 +13,22 @@ public class GemMatchPrevention : IMatchPreventionStrategy
         if (availableGems == null || availableGems.Length == 0)
             return null;
 
+        // Try to find a gem type that won't create matches
         List<SC_Gem> safeGems = availableGems.Where(gemPrefab => !gameBoard.MatchesAt(position, gemPrefab)).ToList();
 
+        // If we have safe options, return a random one
         if (safeGems.Count > 0)
         {
             return safeGems[Random.Range(0, safeGems.Count)];
         }
 
+        // If all gems would create matches, return the one that creates minimum matches
         return GetMinimumMatchGem(gameBoard, position, availableGems);
     }
 
+    /// <summary>
+    /// When matches are unavoidable, selects the gem type that creates the minimum number of matches.
+    /// </summary>
     private SC_Gem GetMinimumMatchGem(GameBoard gameBoard, Vector2Int position, SC_Gem[] availableGems)
     {
         int minMatchCount = int.MaxValue;
@@ -43,6 +49,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
             }
         }
 
+        // Return a random gem from the best options (minimum matches)
         return bestOptions.Count > 0 ? bestOptions[Random.Range(0, bestOptions.Count)] : availableGems[0];
     }
     
@@ -50,9 +57,11 @@ public class GemMatchPrevention : IMatchPreventionStrategy
     {
         int matchGroupCount = 0;
 
+        // Check horizontal match using GameBoard.MatchesAt logic
         if (HasHorizontalMatch(gameBoard, position, gemPrefab))
             matchGroupCount++;
 
+        // Check vertical match using GameBoard.MatchesAt logic
         if (HasVerticalMatch(gameBoard, position, gemPrefab))
             matchGroupCount++;
 
@@ -63,6 +72,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
     {
         GlobalEnums.GemType gemType = gemPrefab.type;
 
+        // Check left side 
         if (position.x > 1)
         {
             SC_Gem left1 = gameBoard.GetGem(position.x - 1, position.y);
@@ -71,6 +81,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
+        // Check right side 
         if (position.x < gameBoard.Width - 2)
         {
             SC_Gem right1 = gameBoard.GetGem(position.x + 1, position.y);
@@ -79,6 +90,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
+        // Check if gem would connect two groups 
         if (position.x > 0 && position.x < gameBoard.Width - 1)
         {
             SC_Gem left = gameBoard.GetGem(position.x - 1, position.y);
@@ -94,6 +106,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
     {
         GlobalEnums.GemType gemType = gemPrefab.type;
 
+        // Check below 
         if (position.y > 1)
         {
             SC_Gem below1 = gameBoard.GetGem(position.x, position.y - 1);
@@ -102,6 +115,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
+        // Check above
         if (position.y < gameBoard.Height - 2)
         {
             SC_Gem above1 = gameBoard.GetGem(position.x, position.y + 1);
@@ -110,6 +124,7 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
+        // Check if gem would connect two groups
         if (position.y > 0 && position.y < gameBoard.Height - 1)
         {
             SC_Gem below = gameBoard.GetGem(position.x, position.y - 1);
