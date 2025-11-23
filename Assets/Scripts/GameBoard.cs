@@ -35,17 +35,26 @@ public class GameBoard
     }
     public bool MatchesAt(Vector2Int _PositionToCheck, SC_Gem _GemToCheck)
     {
+        if (_GemToCheck == null)
+            return false;
+
+        // Check horizontal match (left side)
         if (_PositionToCheck.x > 1)
         {
-            if (allGems[_PositionToCheck.x - 1, _PositionToCheck.y].type == _GemToCheck.type &&
-                allGems[_PositionToCheck.x - 2, _PositionToCheck.y].type == _GemToCheck.type)
+            SC_Gem left1 = allGems[_PositionToCheck.x - 1, _PositionToCheck.y];
+            SC_Gem left2 = allGems[_PositionToCheck.x - 2, _PositionToCheck.y];
+            if (left1 != null && left2 != null &&
+                left1.type == _GemToCheck.type && left2.type == _GemToCheck.type)
                 return true;
         }
 
+        // Check vertical match (below)
         if (_PositionToCheck.y > 1)
         {
-            if (allGems[_PositionToCheck.x, _PositionToCheck.y - 1].type == _GemToCheck.type &&
-                allGems[_PositionToCheck.x, _PositionToCheck.y - 2].type == _GemToCheck.type)
+            SC_Gem below1 = allGems[_PositionToCheck.x, _PositionToCheck.y - 1];
+            SC_Gem below2 = allGems[_PositionToCheck.x, _PositionToCheck.y - 2];
+            if (below1 && below2 &&
+                below1.type == _GemToCheck.type && below2.type == _GemToCheck.type)
                 return true;
         }
 
