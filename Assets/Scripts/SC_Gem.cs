@@ -1,12 +1,15 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 public class SC_Gem : MonoBehaviour
 {
     [HideInInspector]
     public Vector2Int posIndex;
 
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    
     private Vector2 firstTouchPosition;
     private Vector2 finalTouchPosition;
     private bool mousePressed;
@@ -14,11 +17,12 @@ public class SC_Gem : MonoBehaviour
     private SC_Gem otherGem;
 
     public GlobalEnums.GemType type;
+    public GlobalEnums.GemType GemColor = GlobalEnums.GemType.blue; // Color of the bomb (for matching logic)
     public bool isMatch = false;
     private Vector2Int previousPos;
     public GameObject destroyEffect;
     public int scoreValue = 10;
-
+    public SpriteRenderer Sprite => spriteRenderer;
     public int blastSize = 1;
     private SC_GameLogic scGameLogic;
 
@@ -29,7 +33,11 @@ public class SC_Gem : MonoBehaviour
         else
         {
             transform.position = new Vector3(posIndex.x, posIndex.y, 0);
-            scGameLogic.SetGem(posIndex.x, posIndex.y, this);
+            if (posIndex.x >= 0 && posIndex.x < SC_GameVariables.Instance.rowsSize &&
+                posIndex.y >= 0 && posIndex.y < SC_GameVariables.Instance.colsSize)
+            {
+                scGameLogic.SetGem(posIndex.x, posIndex.y, this);
+            }
         }
         if (mousePressed && Input.GetMouseButtonUp(0))
         {
@@ -99,14 +107,14 @@ public class SC_Gem : MonoBehaviour
         scGameLogic.SetGem(posIndex.x,posIndex.y, this);
         scGameLogic.SetGem(otherGem.posIndex.x, otherGem.posIndex.y, otherGem);
 
-        StartCoroutine(CheckMoveCo());
+        CheckMoveCo().Forget();
     }
 
-    public IEnumerator CheckMoveCo()
+    public async UniTask CheckMoveCo()
     {
         scGameLogic.SetState(GlobalEnums.GameState.wait);
 
-        yield return new WaitForSeconds(.5f);
+        await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
         scGameLogic.FindAllMatches();
 
         if (otherGem != null)
@@ -119,7 +127,7 @@ public class SC_Gem : MonoBehaviour
                 scGameLogic.SetGem(posIndex.x, posIndex.y, this);
                 scGameLogic.SetGem(otherGem.posIndex.x, otherGem.posIndex.y, otherGem);
 
-                yield return new WaitForSeconds(.5f);
+                await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
                 scGameLogic.SetState(GlobalEnums.GameState.move);
             }
             else

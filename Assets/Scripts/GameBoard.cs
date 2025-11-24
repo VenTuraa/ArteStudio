@@ -25,6 +25,15 @@ public class GameBoard
 
     private List<SC_Gem> currentMatches = new List<SC_Gem>();
     public List<SC_Gem> CurrentMatches { get { return currentMatches; } }
+    
+    private List<BombCreationInfo> bombsToCreate = new List<BombCreationInfo>();
+    public List<BombCreationInfo> BombsToCreate { get { return bombsToCreate; } }
+    
+    public struct BombCreationInfo
+    {
+        public Vector2Int position;
+        public GlobalEnums.GemType gemType;
+    }
     #endregion
 
     public GameBoard(int _Width, int _Height)
@@ -37,12 +46,15 @@ public class GameBoard
     {
         if (_GemToCheck == null)
             return false;
+        
+        if (!IsValidBoardPosition(_PositionToCheck.x, _PositionToCheck.y))
+            return false;
 
         // Check horizontal match (left side)
         if (_PositionToCheck.x > 1)
         {
-            SC_Gem left1 = allGems[_PositionToCheck.x - 1, _PositionToCheck.y];
-            SC_Gem left2 = allGems[_PositionToCheck.x - 2, _PositionToCheck.y];
+            SC_Gem left1 = GetGem(_PositionToCheck.x - 1, _PositionToCheck.y);
+            SC_Gem left2 = GetGem(_PositionToCheck.x - 2, _PositionToCheck.y);
             if (left1 != null && left2 != null &&
                 left1.type == _GemToCheck.type && left2.type == _GemToCheck.type)
                 return true;
@@ -51,113 +63,247 @@ public class GameBoard
         // Check vertical match (below)
         if (_PositionToCheck.y > 1)
         {
-            SC_Gem below1 = allGems[_PositionToCheck.x, _PositionToCheck.y - 1];
-            SC_Gem below2 = allGems[_PositionToCheck.x, _PositionToCheck.y - 2];
-            if (below1 && below2 &&
+            SC_Gem below1 = GetGem(_PositionToCheck.x, _PositionToCheck.y - 1);
+            SC_Gem below2 = GetGem(_PositionToCheck.x, _PositionToCheck.y - 2);
+            if (below1 != null && below2 != null &&
                 below1.type == _GemToCheck.type && below2.type == _GemToCheck.type)
                 return true;
         }
 
         return false;
     }
-
+    
     public void SetGem(int _X, int _Y, SC_Gem _Gem)
     {
+        if (!IsValidBoardPosition(_X, _Y))
+            return;
+        
         allGems[_X, _Y] = _Gem;
     }
-    public SC_Gem GetGem(int _X,int _Y)
+    
+    public SC_Gem GetGem(int _X, int _Y)
     {
-       return allGems[_X, _Y];
+        if (!IsValidBoardPosition(_X, _Y))
+            return null;
+        
+        return allGems[_X, _Y];
+    }
+    
+    private bool IsValidBoardPosition(int x, int y)
+    {
+        return x >= 0 && x < width && y >= 0 && y < height;
     }
 
+    private BombLogicService bombLogicService;
+    
+    public void SetBombLogicService(BombLogicService service)
+    {
+        bombLogicService = service;
+    }
+    
     public void FindAllMatches()
     {
         currentMatches.Clear();
-
+        bombsToCreate.Clear();
+        
         for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
             {
                 SC_Gem currentGem = allGems[x, y];
-                if (currentGem != null)
+                if (currentGem)
                 {
-                    if (x > 0 && x < width - 1)
-                    {
-                        SC_Gem leftGem = allGems[x - 1, y];
-                        SC_Gem rightGem = allGems[x + 1, y];
-                        //checking no empty spots
-                        if (leftGem != null && rightGem != null)
-                        {
-                            //Match
-                            if (leftGem.type == currentGem.type && rightGem.type == currentGem.type)
-                            {
-                                currentGem.isMatch = true;
-                                leftGem.isMatch = true;
-                                rightGem.isMatch = true;
-                                currentMatches.Add(currentGem);
-                                currentMatches.Add(leftGem);
-                                currentMatches.Add(rightGem);
-                            }
-                        }
-                    }
-
-                    if (y > 0 && y < height - 1)
-                    {
-                        SC_Gem aboveGem = allGems[x, y - 1];
-                        SC_Gem bellowGem = allGems[x, y + 1];
-                        //checking no empty spots
-                        if (aboveGem != null && bellowGem != null)
-                        {
-                            //Match
-                            if (aboveGem.type == currentGem.type && bellowGem.type == currentGem.type)
-                            {
-                                currentGem.isMatch = true;
-                                aboveGem.isMatch = true;
-                                bellowGem.isMatch = true;
-                                currentMatches.Add(currentGem);
-                                currentMatches.Add(aboveGem);
-                                currentMatches.Add(bellowGem);
-                            }
-                        }
-                    }
+                    CheckHorizontalMatch(x, y, currentGem);
+                    CheckVerticalMatch(x, y, currentGem);
                 }
             }
 
         if (currentMatches.Count > 0)
             currentMatches = currentMatches.Distinct().ToList();
 
+        // Also check for bomb-to-bomb matches (any color bombs match with each other)
+        if (bombLogicService != null)
+        {
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                {
+                    SC_Gem currentGem = allGems[x, y];
+                    if (currentGem != null && currentGem.type == GlobalEnums.GemType.bomb)
+                    {
+                        bombLogicService.CheckBombToBombMatch(x, y, currentGem, currentMatches);
+                    }
+                }
+        }
+
+        if (currentMatches.Count > 0)
+            currentMatches = currentMatches.Distinct().ToList();
+
         CheckForBombs();
     }
-
+    
+    
+    /// <summary>
+    /// Gets the color of a gem for matching purposes.
+    /// For bombs: returns GemColor; for regular gems: returns type.
+    /// </summary>
+    private GlobalEnums.GemType GetGemColorForMatch(SC_Gem gem)
+    {
+        if (bombLogicService != null)
+        {
+            return bombLogicService.GetGemColorForMatch(gem);
+        }
+        
+        // Fallback to original logic if service not available
+        if (gem == null)
+            return GlobalEnums.GemType.blue;
+            
+        return gem.type == GlobalEnums.GemType.bomb ? gem.GemColor : gem.type;
+    }
+    
+    /// <summary>
+    /// Checks if a bomb should match based on adjacent gems and current matches.
+    /// Delegates to BombLogicService if available.
+    /// </summary>
+    private void CheckBombMatch(int x, int y, SC_Gem bombGem)
+    {
+        bombLogicService?.CheckBombMatch(x, y, bombGem, currentMatches);
+    }
+    
+    private void CheckHorizontalMatch(int x, int y, SC_Gem currentGem)
+    {
+        if (currentGem == null)
+            return;
+            
+        // Get the color to match
+        // For bombs: use GemColor; for regular gems: use type
+        GlobalEnums.GemType colorToMatch = GetGemColorForMatch(currentGem);
+        
+        List<SC_Gem> matchGroup = new List<SC_Gem> { currentGem };
+        Vector2Int matchStartPos = new Vector2Int(x, y);
+        
+        // Check left
+        for (int i = x - 1; i >= 0; i--)
+        {
+            SC_Gem gem = allGems[i, y];
+            if (gem != null && GetGemColorForMatch(gem) == colorToMatch)
+            {
+                matchGroup.Add(gem);
+                matchStartPos = new Vector2Int(i, y);
+            }
+            else
+                break;
+        }
+        
+        // Check right
+        for (int i = x + 1; i < width; i++)
+        {
+            SC_Gem gem = allGems[i, y];
+            if (gem != null && GetGemColorForMatch(gem) == colorToMatch)
+            {
+                matchGroup.Add(gem);
+            }
+            else
+                break;
+        }
+        
+        if (matchGroup.Count >= 3)
+        {
+            foreach (SC_Gem gem in matchGroup)
+            {
+                gem.isMatch = true;
+                if (!currentMatches.Contains(gem))
+                {
+                    currentMatches.Add(gem);
+                }
+            }
+            
+            if (matchGroup.Count >= 4)
+            {
+                // Use the color of the match group for bomb creation
+                bombsToCreate.Add(new BombCreationInfo
+                {
+                    position = matchStartPos,
+                    gemType = colorToMatch
+                });
+            }
+        }
+    }
+    
+    private void CheckVerticalMatch(int x, int y, SC_Gem currentGem)
+    {
+        if (currentGem == null)
+            return;
+            
+        // Get the color to match
+        // For bombs: use GemColor; for regular gems: use type
+        GlobalEnums.GemType colorToMatch = GetGemColorForMatch(currentGem);
+        
+        List<SC_Gem> matchGroup = new List<SC_Gem> { currentGem };
+        Vector2Int matchStartPos = new Vector2Int(x, y);
+        
+        // Check down
+        for (int i = y - 1; i >= 0; i--)
+        {
+            SC_Gem gem = allGems[x, i];
+            if (gem != null && GetGemColorForMatch(gem) == colorToMatch)
+            {
+                matchGroup.Add(gem);
+                matchStartPos = new Vector2Int(x, i);
+            }
+            else
+                break;
+        }
+        
+        // Check up
+        for (int i = y + 1; i < height; i++)
+        {
+            SC_Gem gem = allGems[x, i];
+            if (gem != null && GetGemColorForMatch(gem) == colorToMatch)
+            {
+                matchGroup.Add(gem);
+            }
+            else
+                break;
+        }
+        
+        if (matchGroup.Count >= 3)
+        {
+            foreach (SC_Gem gem in matchGroup)
+            {
+                gem.isMatch = true;
+                if (!currentMatches.Contains(gem))
+                {
+                    currentMatches.Add(gem);
+                }
+            }
+            
+            if (matchGroup.Count >= 4)
+            {
+                // Use the color of the match group for bomb creation
+                bombsToCreate.Add(new BombCreationInfo
+                {
+                    position = matchStartPos,
+                    gemType = colorToMatch
+                });
+            }
+        }
+    }
+    
     public void CheckForBombs()
     {
-        for (int i = 0; i < currentMatches.Count; i++)
+        if (bombLogicService == null)
+            return;
+        
+        // Check all bombs for matching conditions
+        for (int x = 0; x < width; x++)
         {
-            SC_Gem gem = currentMatches[i];
-            int x = gem.posIndex.x;
-            int y = gem.posIndex.y;
-
-            if (gem.posIndex.x > 0)
+            for (int y = 0; y < height; y++)
             {
-                if (allGems[x - 1, y] != null && allGems[x - 1, y].type == GlobalEnums.GemType.bomb)
-                    MarkBombArea(new Vector2Int(x - 1, y), allGems[x - 1, y].blastSize);
-            }
-
-            if (gem.posIndex.x + 1 < width)
-            {
-                if (allGems[x + 1, y] != null && allGems[x + 1, y].type == GlobalEnums.GemType.bomb)
-                    MarkBombArea(new Vector2Int(x + 1, y), allGems[x + 1, y].blastSize);
-            }
-
-            if (gem.posIndex.y > 0)
-            {
-                if (allGems[x, y - 1] != null && allGems[x, y - 1].type == GlobalEnums.GemType.bomb)
-                    MarkBombArea(new Vector2Int(x, y - 1), allGems[x, y - 1].blastSize);
-            }
-
-            if (gem.posIndex.y + 1 < height)
-            {
-                if (allGems[x, y + 1] != null && allGems[x, y + 1].type == GlobalEnums.GemType.bomb)
-                    MarkBombArea(new Vector2Int(x, y + 1), allGems[x, y + 1].blastSize);
+                SC_Gem bomb = allGems[x, y];
+                if (bomb != null && bomb.type == GlobalEnums.GemType.bomb && !bomb.isMatch)
+                {
+                    // Check if bomb should match (bomb with bomb, or bomb with 2+ same color)
+                    CheckBombMatch(x, y, bomb);
+                }
             }
         }
     }
@@ -181,6 +327,17 @@ public class GameBoard
             }
         }
         currentMatches = currentMatches.Distinct().ToList();
+    }
+    
+    public List<Vector2Int> GetBombExplosionPattern(Vector2Int bombPos)
+    {
+        if (bombLogicService != null)
+        {
+            return bombLogicService.GetBombExplosionPattern(bombPos);
+        }
+        
+        // Fallback to empty list if service not available
+        return new List<Vector2Int>();
     }
 }
 

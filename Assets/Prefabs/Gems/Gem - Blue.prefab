@@ -99,6 +99,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   posIndex: {x: 0, y: 0}
+  spriteRenderer: {fileID: 7667143225876670884}
   type: 0
   isMatch: 0
   destroyEffect: {fileID: 8904178830182364799, guid: d794be08823edd34da1790efd1739074,

@@ -942,8 +942,10 @@ MonoBehaviour:
   bonusAmount: 0.5
   bombChance: 3
   dropHeight: 1
-  gemSpeed: 7
+  gemSpeed: 9
   scoreSpeed: 5
+  bombNeighborDestroyDelay: 0.3
+  bombDestroyDelay: 0.5
   rowsSize: 7
   colsSize: 7
 --- !u!1 &1450061018
