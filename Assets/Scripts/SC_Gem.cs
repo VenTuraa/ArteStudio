@@ -26,13 +26,19 @@ public class SC_Gem : MonoBehaviour
     public int blastSize = 1;
     private SC_GameLogic scGameLogic;
 
+    private Vector3 velocity = Vector3.zero;
+    
     void Update()
     {
         if (Vector2.Distance(transform.position, posIndex) > 0.01f)
-            transform.position = Vector2.Lerp(transform.position, posIndex, SC_GameVariables.Instance.gemSpeed * Time.deltaTime);
+        {
+            Vector3 targetPosition = new Vector3(posIndex.x, posIndex.y, 0);
+            transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, 0.12f, SC_GameVariables.Instance.gemSpeed * 1.5f, Time.deltaTime);
+        }
         else
         {
             transform.position = new Vector3(posIndex.x, posIndex.y, 0);
+            velocity = Vector3.zero;
             if (posIndex.x >= 0 && posIndex.x < SC_GameVariables.Instance.rowsSize &&
                 posIndex.y >= 0 && posIndex.y < SC_GameVariables.Instance.colsSize)
             {
@@ -110,7 +116,7 @@ public class SC_Gem : MonoBehaviour
         CheckMoveCo().Forget();
     }
 
-    public async UniTask CheckMoveCo()
+    private async UniTask CheckMoveCo()
     {
         scGameLogic.SetState(GlobalEnums.GameState.wait);
 

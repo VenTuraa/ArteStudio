@@ -16,7 +16,7 @@ public class GemPool
 
     public SC_Gem GetGem(SC_Gem gemPrefab, Vector3 position, Transform parent)
     {
-        if (gemPrefab == null)
+        if (!gemPrefab)
             return null;
 
         GlobalEnums.GemType gemType = gemPrefab.type;
@@ -45,7 +45,7 @@ public class GemPool
 
     public void ReturnToPool(SC_Gem gem)
     {
-        if (gem == null || !gem.gameObject)
+        if (!gem || !gem.gameObject)
             return;
 
         GlobalEnums.GemType gemType = gem.type;
@@ -75,7 +75,7 @@ public class GemPool
 
         foreach (SC_Gem prefab in gemPrefabs)
         {
-            if (prefab == null)
+            if (!prefab)
                 continue;
 
             GlobalEnums.GemType gemType = prefab.type;

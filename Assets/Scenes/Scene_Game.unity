@@ -233,8 +233,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 174139325}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.1101, y: 3.0684, z: 0}
-  m_LocalScale: {x: 7.8636, y: 7.7716, z: 1}
+  m_LocalPosition: {x: 2.9585, y: 2.9984, z: 0}
+  m_LocalScale: {x: 8.558807, y: 8.028634, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -943,9 +943,10 @@ MonoBehaviour:
   bombChance: 3
   dropHeight: 1
   gemSpeed: 9
-  scoreSpeed: 5
+  cascadeDelay: 0.05
   bombNeighborDestroyDelay: 0.3
   bombDestroyDelay: 0.5
+  scoreSpeed: 5
   rowsSize: 7
   colsSize: 7
 --- !u!1 &1450061018
