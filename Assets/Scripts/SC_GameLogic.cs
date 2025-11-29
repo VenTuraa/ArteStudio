@@ -9,6 +9,15 @@ using Random = UnityEngine.Random;
 public class SC_GameLogic : MonoBehaviour
 {
     private const int MAX_MATCH_PREVENTION_ITERATIONS = 100;
+    private const float FILLED_BOARD_DELAY = 0.5f;
+    
+    private static readonly Vector2Int[] NEIGHBOR_DIRECTIONS = new Vector2Int[]
+    {
+        new(1, 0),  // right
+        new(-1, 0), // left
+        new(0, 1),  // up
+        new(0, -1)  // down
+    };
 
     [SerializeField] private Transform poolParent;
 
@@ -22,6 +31,7 @@ public class SC_GameLogic : MonoBehaviour
     private BombLogicService bombLogicService;
     private HashSet<SC_Gem> explodingBombs = new();
     private bool isProcessingBombExplosions;
+    private HashSet<SC_Gem> cascadeGems = new(); // Track gems involved in current cascade
     public GlobalEnums.GameState CurrentState => currentState;
 
     #region MonoBehaviour
@@ -114,16 +124,12 @@ public class SC_GameLogic : MonoBehaviour
 
     private void SpawnGem(Vector2Int _Position, SC_Gem _GemToSpawn)
     {
-        // Bombs are only created through match 4+ logic, not randomly
         Vector3 spawnPosition = new Vector3(_Position.x, _Position.y + SC_GameVariables.Instance.dropHeight, 0f);
         SC_Gem _gem = gemPool.GetGem(_GemToSpawn, spawnPosition, unityObjects["GemsHolder"].transform);
         _gem.name = "Gem - " + _Position.x + ", " + _Position.y;
 
-        // Set GemColor for regular gems (for bomb matching logic)
         if (_gem.type != GlobalEnums.GemType.bomb)
-        {
             _gem.GemColor = _gem.type;
-        }
 
         gameBoard.SetGem(_Position.x, _Position.y, _gem);
         _gem.SetupGem(this, _Position);
@@ -214,11 +220,10 @@ public class SC_GameLogic : MonoBehaviour
     {
         await UniTask.Delay(TimeSpan.FromSeconds(0.2f));
 
-        // Process each column separately for cascading effect
+        cascadeGems.Clear();
+
         for (int x = 0; x < gameBoard.Width; x++)
-        {
             await CascadeColumn(x);
-        }
 
         FilledBoardCo().Forget();
     }
@@ -228,6 +233,15 @@ public class SC_GameLogic : MonoBehaviour
     {
         List<GemDropInfo> dropQueue = BuildDropQueueForColumn(column);
         SpawnNewGemsForColumn(column, dropQueue);
+
+        foreach (var dropInfo in dropQueue)
+        {
+            if (dropInfo.gem)
+            {
+                cascadeGems.Add(dropInfo.gem);
+            }
+        }
+
         await ExecuteStaggeredDrop(column, dropQueue);
     }
 
@@ -496,26 +510,208 @@ public class SC_GameLogic : MonoBehaviour
 
     private async UniTask FilledBoardCo()
     {
-        await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
+        await DelaySeconds(FILLED_BOARD_DELAY);
 
         CheckMisplacedGems();
-        await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
+        await DelaySeconds(FILLED_BOARD_DELAY);
+        
         gameBoard.FindAllMatches();
-        if (gameBoard.CurrentMatches.Count > 0)
+        List<SC_Gem> validCascadeMatches = FilterValidCascadeMatches(gameBoard.CurrentMatches);
+
+        if (validCascadeMatches.Count > 0)
         {
-            await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
+            ProcessCascadeMatches(validCascadeMatches);
+            await DelaySeconds(FILLED_BOARD_DELAY);
             DestroyMatches();
         }
         else
         {
-            await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
-            currentState = GlobalEnums.GameState.move;
+            ClearMatchesAndReturnToMoveState();
+            await DelaySeconds(FILLED_BOARD_DELAY);
         }
+
+        cascadeGems.Clear();
+    }
+
+    private async UniTask DelaySeconds(float seconds)
+    {
+        await UniTask.Delay(System.TimeSpan.FromSeconds(seconds));
+    }
+
+    private void ProcessCascadeMatches(List<SC_Gem> validCascadeMatches)
+    {
+        gameBoard.CurrentMatches.Clear();
+        gameBoard.CurrentMatches.AddRange(validCascadeMatches);
+    }
+
+    private void ClearMatchesAndReturnToMoveState()
+    {
+        gameBoard.CurrentMatches.Clear();
+        currentState = GlobalEnums.GameState.move;
+    }
+
+    private List<SC_Gem> FilterValidCascadeMatches(List<SC_Gem> allMatches)
+    {
+        if (allMatches.Count == 0 || cascadeGems.Count == 0)
+            return new List<SC_Gem>();
+
+        HashSet<SC_Gem> validMatchGems = new HashSet<SC_Gem>();
+        HashSet<SC_Gem> processedGems = new HashSet<SC_Gem>();
+
+        foreach (SC_Gem gem in allMatches)
+        {
+            if (!gem || processedGems.Contains(gem))
+                continue;
+
+            List<SC_Gem> matchGroup = BuildMatchGroupFromGem(gem, allMatches);
+            CascadeMatchValidation validation = ValidateMatchGroup(matchGroup);
+
+            if (validation.IsValid)
+            {
+                AddMatchGroupToValid(validMatchGems, processedGems, matchGroup);
+            }
+            else
+            {
+                MarkMatchGroupAsProcessed(processedGems, matchGroup);
+            }
+        }
+
+        return validMatchGems.ToList();
+    }
+
+    private CascadeMatchValidation ValidateMatchGroup(List<SC_Gem> matchGroup)
+    {
+        bool containsCascadeGem = matchGroup.Any(g => cascadeGems.Contains(g));
+        
+        if (containsCascadeGem)
+            return new CascadeMatchValidation(true, true, false);
+
+        bool isAdjacentToCascade = matchGroup.Any(IsAdjacentToAnyCascadeGem);
+        
+        if (isAdjacentToCascade)
+            return new CascadeMatchValidation(true, false, true);
+
+        bool isBombToBombMatch = matchGroup.Count > 0 && 
+                                 matchGroup.All(g => g && g.type == GlobalEnums.GemType.bomb);
+        
+        return new CascadeMatchValidation(isBombToBombMatch, false, false);
+    }
+
+    private void AddMatchGroupToValid(HashSet<SC_Gem> validMatchGems, HashSet<SC_Gem> processedGems, List<SC_Gem> matchGroup)
+    {
+        foreach (SC_Gem groupGem in matchGroup)
+        {
+            validMatchGems.Add(groupGem);
+            processedGems.Add(groupGem);
+        }
+    }
+
+    private void MarkMatchGroupAsProcessed(HashSet<SC_Gem> processedGems, List<SC_Gem> matchGroup)
+    {
+        foreach (SC_Gem groupGem in matchGroup)
+        {
+            processedGems.Add(groupGem);
+        }
+    }
+
+    private struct CascadeMatchValidation
+    {
+        public bool IsValid { get; }
+        public bool ContainsCascadeGem { get; }
+        public bool IsAdjacentToCascade { get; }
+
+        public CascadeMatchValidation(bool isValid, bool containsCascadeGem, bool isAdjacentToCascade)
+        {
+            IsValid = isValid;
+            ContainsCascadeGem = containsCascadeGem;
+            IsAdjacentToCascade = isAdjacentToCascade;
+        }
+    }
+
+    private bool IsAdjacentToAnyCascadeGem(SC_Gem gem)
+    {
+        if (!gem)
+            return false;
+
+        Vector2Int gemPos = gem.posIndex;
+
+        foreach (Vector2Int dir in NEIGHBOR_DIRECTIONS)
+        {
+            Vector2Int neighborPos = gemPos + dir;
+            SC_Gem neighbor = GetGem(neighborPos.x, neighborPos.y);
+
+            if (neighbor && cascadeGems.Contains(neighbor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private List<SC_Gem> BuildMatchGroupFromGem(SC_Gem startGem, List<SC_Gem> allMatches)
+    {
+        if (!startGem)
+            return new List<SC_Gem>();
+
+        HashSet<SC_Gem> matchGroup = new HashSet<SC_Gem> { startGem };
+        bool isBombMatch = startGem.type == GlobalEnums.GemType.bomb;
+        GlobalEnums.GemType gemType = isBombMatch ? GlobalEnums.GemType.bomb : GetGemTypeForMatch(startGem);
+
+        Queue<SC_Gem> toProcess = new Queue<SC_Gem>();
+        toProcess.Enqueue(startGem);
+
+        while (toProcess.Count > 0)
+        {
+            SC_Gem currentGem = toProcess.Dequeue();
+            ProcessNeighborsForMatchGroup(currentGem, allMatches, matchGroup, toProcess, isBombMatch, gemType);
+        }
+
+        return matchGroup.ToList();
+    }
+
+    private void ProcessNeighborsForMatchGroup(SC_Gem currentGem, List<SC_Gem> allMatches, 
+        HashSet<SC_Gem> matchGroup, Queue<SC_Gem> toProcess, bool isBombMatch, GlobalEnums.GemType gemType)
+    {
+        Vector2Int currentPos = currentGem.posIndex;
+
+        foreach (Vector2Int dir in NEIGHBOR_DIRECTIONS)
+        {
+            Vector2Int neighborPos = currentPos + dir;
+            SC_Gem neighbor = GetGem(neighborPos.x, neighborPos.y);
+
+            if (ShouldIncludeNeighborInMatchGroup(neighbor, allMatches, matchGroup, isBombMatch, gemType))
+            {
+                matchGroup.Add(neighbor);
+                toProcess.Enqueue(neighbor);
+            }
+        }
+    }
+
+    private bool ShouldIncludeNeighborInMatchGroup(SC_Gem neighbor, List<SC_Gem> allMatches, 
+        HashSet<SC_Gem> matchGroup, bool isBombMatch, GlobalEnums.GemType gemType)
+    {
+        if (!neighbor || !allMatches.Contains(neighbor) || matchGroup.Contains(neighbor))
+            return false;
+
+        return isBombMatch 
+            ? neighbor.type == GlobalEnums.GemType.bomb 
+            : GetGemTypeForMatch(neighbor) == gemType;
+    }
+
+    private GlobalEnums.GemType GetGemTypeForMatch(SC_Gem gem)
+    {
+        if (!gem)
+            return GlobalEnums.GemType.blue;
+
+        if (bombLogicService != null)
+            return bombLogicService.GetGemColorForMatch(gem);
+
+        return gem.type == GlobalEnums.GemType.bomb ? gem.GemColor : gem.type;
     }
 
     private void CheckMisplacedGems()
     {
-        // Get all active gems from GameBoard
         HashSet<SC_Gem> foundGems = new HashSet<SC_Gem>(gameBoard.ActiveGems);
 
         // Remove gems that are properly placed on the board
@@ -529,7 +725,6 @@ public class SC_GameLogic : MonoBehaviour
             }
         }
 
-        // Return misplaced gems to pool
         foreach (SC_Gem g in foundGems)
         {
             gameBoard.ActiveGems.Remove(g);
