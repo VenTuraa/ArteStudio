@@ -13,7 +13,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
         if (availableGems == null || availableGems.Length == 0)
             return null;
 
-        // Try to find a gem type that won't create matches
         var safeGems = availableGems.Where(gemPrefab => !gameBoard.MatchesAt(position, gemPrefab)).ToList();
 
         if (safeGems.Count > 0)

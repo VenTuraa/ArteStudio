@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Zenject;
 
 public class BombLogicService
 {
@@ -20,14 +21,20 @@ public class BombLogicService
     };
 
     private readonly GameBoard gameBoard;
+    private readonly SC_GameVariables gameVariables;
     private Action<SC_Gem> onScoreAdd;
     private Action<Vector2Int, Func<SC_Gem, bool>> onDestroyGem;
     private Action onExplosionsComplete;
     private Func<Vector2Int, GlobalEnums.GemType, SC_Gem> onCreateBomb;
 
-    public BombLogicService(GameBoard gameBoard)
+    public BombLogicService(GameBoard gameBoard, SC_GameVariables gameVariables)
     {
         this.gameBoard = gameBoard ?? throw new System.ArgumentNullException(nameof(gameBoard));
+        this.gameVariables = gameVariables ?? throw new System.ArgumentNullException(nameof(gameVariables));
+    }
+    
+    public class Factory : PlaceholderFactory<GameBoard, BombLogicService>
+    {
     }
 
     public void SetCallbacks(Action<SC_Gem> scoreCallback, Action<Vector2Int, Func<SC_Gem, bool>> destroyCallback,
@@ -70,7 +77,7 @@ public class BombLogicService
 
     public void CheckBombToBombMatch(int x, int y, SC_Gem bombGem, List<SC_Gem> currentMatches)
     {
-        if (bombGem == null || bombGem.type != GlobalEnums.GemType.bomb)
+        if (!bombGem || bombGem.type != GlobalEnums.GemType.bomb)
             return;
 
         if (HasAdjacentBomb(x, y))
@@ -330,10 +337,10 @@ public class BombLogicService
         Vector2Int bombPos = bomb.posIndex;
         var explosionPositions = GetBombExplosionPattern(bombPos);
 
-        await UniTask.Delay(System.TimeSpan.FromSeconds(SC_GameVariables.Instance.bombNeighborDestroyDelay));
+        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.bombNeighborDestroyDelay));
         DestroyNeighborsInExplosion(bomb, explosionPositions, processedBombs, bombsToExplodeNext);
 
-        await UniTask.Delay(System.TimeSpan.FromSeconds(SC_GameVariables.Instance.bombDestroyDelay));
+        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.bombDestroyDelay));
         DestroyBombIfStillPresent(bomb, bombPos);
 
         explodingBombs.Remove(bomb);

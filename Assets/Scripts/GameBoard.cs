@@ -1,7 +1,8 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Zenject;
 
 public class GameBoard
 {
@@ -324,5 +325,9 @@ public class GameBoard
 
         // Fallback to empty list if service not available
         return new List<Vector2Int>();
+    }
+    
+    public class Factory : PlaceholderFactory<int, int, GameBoard>
+    {
     }
 }

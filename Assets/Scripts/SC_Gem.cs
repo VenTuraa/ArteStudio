@@ -1,7 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using Zenject;
 
 public class SC_Gem : MonoBehaviour
 {
@@ -9,6 +8,8 @@ public class SC_Gem : MonoBehaviour
     public Vector2Int posIndex;
 
     [SerializeField] private SpriteRenderer spriteRenderer;
+    
+    [Inject] private SC_GameVariables gameVariables;
     
     private Vector2 firstTouchPosition;
     private Vector2 finalTouchPosition;
@@ -33,14 +34,14 @@ public class SC_Gem : MonoBehaviour
         if (Vector2.Distance(transform.position, posIndex) > 0.01f)
         {
             Vector3 targetPosition = new Vector3(posIndex.x, posIndex.y, 0);
-            transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, 0.12f, SC_GameVariables.Instance.gemSpeed * 1.5f, Time.deltaTime);
+            transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, 0.12f, gameVariables.gemSpeed * 1.5f, Time.deltaTime);
         }
         else
         {
             transform.position = new Vector3(posIndex.x, posIndex.y, 0);
             velocity = Vector3.zero;
-            if (posIndex.x >= 0 && posIndex.x < SC_GameVariables.Instance.rowsSize &&
-                posIndex.y >= 0 && posIndex.y < SC_GameVariables.Instance.colsSize)
+            if (posIndex.x >= 0 && posIndex.x < gameVariables.rowsSize &&
+                posIndex.y >= 0 && posIndex.y < gameVariables.colsSize)
             {
                 scGameLogic.SetGem(posIndex.x, posIndex.y, this);
             }
@@ -84,14 +85,14 @@ public class SC_Gem : MonoBehaviour
     {
         previousPos = posIndex;
 
-        if (swipeAngle < 45 && swipeAngle > -45 && posIndex.x < SC_GameVariables.Instance.rowsSize - 1)
+        if (swipeAngle < 45 && swipeAngle > -45 && posIndex.x < gameVariables.rowsSize - 1)
         {
             otherGem = scGameLogic.GetGem(posIndex.x + 1, posIndex.y);
             otherGem.posIndex.x--;
             posIndex.x++;
 
         }
-        else if (swipeAngle > 45 && swipeAngle <= 135 && posIndex.y < SC_GameVariables.Instance.colsSize - 1)
+        else if (swipeAngle > 45 && swipeAngle <= 135 && posIndex.y < gameVariables.colsSize - 1)
         {
             otherGem = scGameLogic.GetGem(posIndex.x, posIndex.y + 1);
             otherGem.posIndex.y--;

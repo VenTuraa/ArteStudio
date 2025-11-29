@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using Random = UnityEngine.Random;
+using Zenject;
 
 public class SC_GameLogic : MonoBehaviour
 {
@@ -21,12 +22,17 @@ public class SC_GameLogic : MonoBehaviour
 
     [SerializeField] private Transform poolParent;
 
+    [Inject] private SC_GameVariables gameVariables;
+    [Inject] private IMatchPreventionStrategy matchPrevention;
+    [Inject] private GameBoard.Factory gameBoardFactory;
+    [Inject] private BombLogicService.Factory bombLogicServiceFactory;
+    [Inject] private GemPool.Factory gemPoolFactory;
+
     private Dictionary<string, GameObject> unityObjects;
     private int score = 0;
     private float displayScore;
     private GameBoard gameBoard;
     private GlobalEnums.GameState currentState = GlobalEnums.GameState.move;
-    private IMatchPreventionStrategy matchPrevention;
     private GemPool gemPool;
     private BombLogicService bombLogicService;
     private HashSet<SC_Gem> explodingBombs = new();
@@ -36,11 +42,13 @@ public class SC_GameLogic : MonoBehaviour
 
     #region MonoBehaviour
 
-    private void Awake()
+    [Inject]
+    private void Construct()
     {
+        // This method will be called by Zenject after injection
         Init();
     }
-
+    
     private void Start()
     {
         StartGame();
@@ -48,7 +56,7 @@ public class SC_GameLogic : MonoBehaviour
 
     private void Update()
     {
-        displayScore = Mathf.Lerp(displayScore, gameBoard.Score, SC_GameVariables.Instance.scoreSpeed * Time.deltaTime);
+        displayScore = Mathf.Lerp(displayScore, gameBoard.Score, gameVariables.scoreSpeed * Time.deltaTime);
         unityObjects["Txt_Score"].GetComponent<TMPro.TextMeshProUGUI>().text = displayScore.ToString("0");
     }
 
@@ -63,20 +71,19 @@ public class SC_GameLogic : MonoBehaviour
         foreach (GameObject g in _obj)
             unityObjects.Add(g.name, g);
 
-        gameBoard = new GameBoard(7, 7);
-        matchPrevention = new GemMatchPrevention();
+        gameBoard = gameBoardFactory.Create(7, 7);
 
         // Initialize bomb logic service and inject into game board
-        bombLogicService = new BombLogicService(gameBoard);
+        bombLogicService = bombLogicServiceFactory.Create(gameBoard);
         bombLogicService.SetCallbacks(ScoreCheck, DestroyGem, OnBombExplosionsComplete, CreateBombInstance);
         gameBoard.SetBombLogicService(bombLogicService);
 
-        gemPool = new GemPool(poolParent.transform, 50);
+        gemPool = gemPoolFactory.Create(poolParent.transform, 50);
 
-        gemPool.WarmPool(SC_GameVariables.Instance.gems, 5);
-        if (SC_GameVariables.Instance.bomb != null)
+        gemPool.WarmPool(gameVariables.gems, 5);
+        if (gameVariables.bomb != null)
         {
-            SC_Gem[] bombArray = { SC_GameVariables.Instance.bomb };
+            SC_Gem[] bombArray = { gameVariables.bomb };
             gemPool.WarmPool(bombArray, 2);
         }
 
@@ -97,24 +104,24 @@ public class SC_GameLogic : MonoBehaviour
     private void CreateBackgroundTile(int x, int y)
     {
         Vector2 position = new Vector2(x, y);
-        GameObject bgTile = Instantiate(SC_GameVariables.Instance.bgTilePrefabs, position, Quaternion.identity);
+        GameObject bgTile = Instantiate(gameVariables.bgTilePrefabs, position, Quaternion.identity);
         bgTile.transform.SetParent(unityObjects["GemsHolder"].transform);
         bgTile.name = "BG Tile - " + x + ", " + y;
     }
 
     private SC_Gem GetInitialGemForPosition(int x, int y, int maxIterations)
     {
-        int gemIndex = Random.Range(0, SC_GameVariables.Instance.gems.Length);
+        int gemIndex = Random.Range(0, gameVariables.gems.Length);
         int iterations = 0;
 
-        while (gameBoard.MatchesAt(new Vector2Int(x, y), SC_GameVariables.Instance.gems[gemIndex]) &&
+        while (gameBoard.MatchesAt(new Vector2Int(x, y), gameVariables.gems[gemIndex]) &&
                iterations < maxIterations)
         {
-            gemIndex = Random.Range(0, SC_GameVariables.Instance.gems.Length);
+            gemIndex = Random.Range(0, gameVariables.gems.Length);
             iterations++;
         }
 
-        return SC_GameVariables.Instance.gems[gemIndex];
+        return gameVariables.gems[gemIndex];
     }
 
     private void StartGame()
@@ -124,7 +131,7 @@ public class SC_GameLogic : MonoBehaviour
 
     private void SpawnGem(Vector2Int _Position, SC_Gem _GemToSpawn)
     {
-        Vector3 spawnPosition = new Vector3(_Position.x, _Position.y + SC_GameVariables.Instance.dropHeight, 0f);
+        Vector3 spawnPosition = new Vector3(_Position.x, _Position.y + gameVariables.dropHeight, 0f);
         SC_Gem _gem = gemPool.GetGem(_GemToSpawn, spawnPosition, unityObjects["GemsHolder"].transform);
         _gem.name = "Gem - " + _Position.x + ", " + _Position.y;
 
@@ -204,7 +211,7 @@ public class SC_GameLogic : MonoBehaviour
 
     private SC_Gem CreateBombInstance(Vector2Int position, GlobalEnums.GemType gemType)
     {
-        SC_Gem bombPrefab = SC_GameVariables.Instance.bomb;
+        SC_Gem bombPrefab = gameVariables.bomb;
         if (!bombPrefab)
             return null;
 
@@ -326,12 +333,12 @@ public class SC_GameLogic : MonoBehaviour
         SC_Gem safeGem = matchPrevention.GetSafeGemType(
             simulatedBoard,
             new Vector2Int(column, targetY),
-            SC_GameVariables.Instance.gems
+            gameVariables.gems
         );
 
         if (!safeGem)
         {
-            safeGem = SC_GameVariables.Instance.gems[Random.Range(0, SC_GameVariables.Instance.gems.Length)];
+            safeGem = gameVariables.gems[Random.Range(0, gameVariables.gems.Length)];
         }
 
         return safeGem;
@@ -409,7 +416,7 @@ public class SC_GameLogic : MonoBehaviour
 
     private SC_Gem SpawnGemAtPosition(int column, int spawnY, SC_Gem gemPrefab)
     {
-        Vector3 spawnPosition = new Vector3(column, spawnY + SC_GameVariables.Instance.dropHeight, 0f);
+        Vector3 spawnPosition = new Vector3(column, spawnY + gameVariables.dropHeight, 0f);
         SC_Gem newGem = gemPool.GetGem(gemPrefab, spawnPosition, unityObjects["GemsHolder"].transform);
         newGem.name = "Gem - " + column + ", " + spawnY;
         return newGem;
@@ -464,14 +471,14 @@ public class SC_GameLogic : MonoBehaviour
             if (distanceMoved >= threshold)
             {
                 await UniTask.Delay(
-                    System.TimeSpan.FromSeconds(SC_GameVariables.Instance.cascadeDelay * CASCADE_DELAY_MULTIPLIER));
+                    System.TimeSpan.FromSeconds(gameVariables.cascadeDelay * CASCADE_DELAY_MULTIPLIER));
                 return;
             }
 
             await UniTask.Yield();
         }
 
-        await UniTask.Delay(System.TimeSpan.FromSeconds(SC_GameVariables.Instance.cascadeDelay));
+        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.cascadeDelay));
     }
 
     private void ScoreCheck(SC_Gem gemToCheck)
@@ -549,7 +556,6 @@ public class SC_GameLogic : MonoBehaviour
         gameBoard.CurrentMatches.Clear();
         currentState = GlobalEnums.GameState.move;
     }
-
     private List<SC_Gem> FilterValidCascadeMatches(List<SC_Gem> allMatches)
     {
         if (allMatches.Count == 0 || cascadeGems.Count == 0)
@@ -581,20 +587,20 @@ public class SC_GameLogic : MonoBehaviour
 
     private CascadeMatchValidation ValidateMatchGroup(List<SC_Gem> matchGroup)
     {
+        // Only matches that contain cascade gems (gems that actually fell) are valid
+        // This prevents pre-existing matches from triggering automatically
         bool containsCascadeGem = matchGroup.Any(g => cascadeGems.Contains(g));
         
         if (containsCascadeGem)
+        {
+            // Valid: match contains at least one gem that fell in the cascade
             return new CascadeMatchValidation(true, true, false);
+        }
 
-        bool isAdjacentToCascade = matchGroup.Any(IsAdjacentToAnyCascadeGem);
-        
-        if (isAdjacentToCascade)
-            return new CascadeMatchValidation(true, false, true);
-
-        bool isBombToBombMatch = matchGroup.Count > 0 && 
-                                 matchGroup.All(g => g && g.type == GlobalEnums.GemType.bomb);
-        
-        return new CascadeMatchValidation(isBombToBombMatch, false, false);
+        // Matches that are only adjacent to cascade gems are NOT valid
+        // They were already on the board and weren't caused by the cascade
+        // Bomb-to-bomb matches are also only valid if they contain cascade gems
+        return new CascadeMatchValidation(false, false, false);
     }
 
     private void AddMatchGroupToValid(HashSet<SC_Gem> validMatchGems, HashSet<SC_Gem> processedGems, List<SC_Gem> matchGroup)
