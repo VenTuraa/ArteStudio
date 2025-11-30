@@ -12,6 +12,7 @@ public class SC_GameVariables : MonoBehaviour
     public int dropHeight = 0;
     public float gemSpeed;
     public float cascadeDelay = 0.05f; // Delay between each gem drop in cascade
+    public float bombExplosionDelay = 1f; // Initial delay before bomb starts exploding (matches visual animation)
     public float bombNeighborDestroyDelay = 0.3f; // Delay before destroying neighbor pieces
     public float bombDestroyDelay = 0.5f; // Delay before destroying the bomb itself
     public float scoreSpeed = 5;

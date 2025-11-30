@@ -9,7 +9,6 @@ public class BombLogicService
     private const int MIN_SAME_COLOR_COUNT_FOR_BOMB_MATCH = 2;
     private const int MIN_REGULAR_COUNT_FOR_NEW_BOMB = 3;
     private const int CARDINAL_EXPLOSION_RADIUS = 2;
-    private const float POST_EXPLOSION_DELAY = 0.2f;
 
     private static readonly Dictionary<GlobalEnums.GemType, Color> BombColorMap = new()
     {

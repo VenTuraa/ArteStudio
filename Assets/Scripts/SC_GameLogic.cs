@@ -11,13 +11,13 @@ public class SC_GameLogic : MonoBehaviour
 {
     private const int MAX_MATCH_PREVENTION_ITERATIONS = 100;
     private const float FILLED_BOARD_DELAY = 0.5f;
-    
+
     private static readonly Vector2Int[] NEIGHBOR_DIRECTIONS = new Vector2Int[]
     {
-        new(1, 0),  // right
+        new(1, 0), // right
         new(-1, 0), // left
-        new(0, 1),  // up
-        new(0, -1)  // down
+        new(0, 1), // up
+        new(0, -1) // down
     };
 
     [SerializeField] private Transform poolParent;
@@ -48,7 +48,7 @@ public class SC_GameLogic : MonoBehaviour
         // This method will be called by Zenject after injection
         Init();
     }
-    
+
     private void Start()
     {
         StartGame();
@@ -521,7 +521,7 @@ public class SC_GameLogic : MonoBehaviour
 
         CheckMisplacedGems();
         await DelaySeconds(FILLED_BOARD_DELAY);
-        
+
         gameBoard.FindAllMatches();
         List<SC_Gem> validCascadeMatches = FilterValidCascadeMatches(gameBoard.CurrentMatches);
 
@@ -556,6 +556,7 @@ public class SC_GameLogic : MonoBehaviour
         gameBoard.CurrentMatches.Clear();
         currentState = GlobalEnums.GameState.move;
     }
+
     private List<SC_Gem> FilterValidCascadeMatches(List<SC_Gem> allMatches)
     {
         if (allMatches.Count == 0 || cascadeGems.Count == 0)
@@ -587,23 +588,32 @@ public class SC_GameLogic : MonoBehaviour
 
     private CascadeMatchValidation ValidateMatchGroup(List<SC_Gem> matchGroup)
     {
-        // Only matches that contain cascade gems (gems that actually fell) are valid
-        // This prevents pre-existing matches from triggering automatically
         bool containsCascadeGem = matchGroup.Any(g => cascadeGems.Contains(g));
-        
+
         if (containsCascadeGem)
         {
-            // Valid: match contains at least one gem that fell in the cascade
             return new CascadeMatchValidation(true, true, false);
         }
 
-        // Matches that are only adjacent to cascade gems are NOT valid
-        // They were already on the board and weren't caused by the cascade
-        // Bomb-to-bomb matches are also only valid if they contain cascade gems
+        bool isBombToBombMatch = matchGroup.Count > 0 &&
+                                 matchGroup.All(g => g && g.type == GlobalEnums.GemType.bomb);
+
+        if (isBombToBombMatch)
+        {
+            bool hasCascadeBomb = matchGroup.Any(g => cascadeGems.Contains(g));
+            bool isAdjacentToCascade = matchGroup.Any(IsAdjacentToAnyCascadeGem);
+
+            if (hasCascadeBomb || isAdjacentToCascade)
+            {
+                return new CascadeMatchValidation(true, hasCascadeBomb, isAdjacentToCascade);
+            }
+        }
+
         return new CascadeMatchValidation(false, false, false);
     }
 
-    private void AddMatchGroupToValid(HashSet<SC_Gem> validMatchGems, HashSet<SC_Gem> processedGems, List<SC_Gem> matchGroup)
+    private void AddMatchGroupToValid(HashSet<SC_Gem> validMatchGems, HashSet<SC_Gem> processedGems,
+        List<SC_Gem> matchGroup)
     {
         foreach (SC_Gem groupGem in matchGroup)
         {
@@ -676,7 +686,7 @@ public class SC_GameLogic : MonoBehaviour
         return matchGroup.ToList();
     }
 
-    private void ProcessNeighborsForMatchGroup(SC_Gem currentGem, List<SC_Gem> allMatches, 
+    private void ProcessNeighborsForMatchGroup(SC_Gem currentGem, List<SC_Gem> allMatches,
         HashSet<SC_Gem> matchGroup, Queue<SC_Gem> toProcess, bool isBombMatch, GlobalEnums.GemType gemType)
     {
         Vector2Int currentPos = currentGem.posIndex;
@@ -694,14 +704,14 @@ public class SC_GameLogic : MonoBehaviour
         }
     }
 
-    private bool ShouldIncludeNeighborInMatchGroup(SC_Gem neighbor, List<SC_Gem> allMatches, 
+    private bool ShouldIncludeNeighborInMatchGroup(SC_Gem neighbor, List<SC_Gem> allMatches,
         HashSet<SC_Gem> matchGroup, bool isBombMatch, GlobalEnums.GemType gemType)
     {
         if (!neighbor || !allMatches.Contains(neighbor) || matchGroup.Contains(neighbor))
             return false;
 
-        return isBombMatch 
-            ? neighbor.type == GlobalEnums.GemType.bomb 
+        return isBombMatch
+            ? neighbor.type == GlobalEnums.GemType.bomb
             : GetGemTypeForMatch(neighbor) == gemType;
     }
 
