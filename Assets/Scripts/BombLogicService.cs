@@ -9,6 +9,7 @@ public class BombLogicService
     private const int MIN_SAME_COLOR_COUNT_FOR_BOMB_MATCH = 2;
     private const int MIN_REGULAR_COUNT_FOR_NEW_BOMB = 3;
     private const int CARDINAL_EXPLOSION_RADIUS = 2;
+    private const float POST_EXPLOSION_DELAY = 0.1f;
 
     private static readonly Dictionary<GlobalEnums.GemType, Color> BombColorMap = new()
     {
@@ -336,10 +337,9 @@ public class BombLogicService
         Vector2Int bombPos = bomb.posIndex;
         var explosionPositions = GetBombExplosionPattern(bombPos);
 
-        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.bombNeighborDestroyDelay));
+        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.bombExplosionDelay));
+        
         DestroyNeighborsInExplosion(bomb, explosionPositions, processedBombs, bombsToExplodeNext);
-
-        await UniTask.Delay(System.TimeSpan.FromSeconds(gameVariables.bombDestroyDelay));
         DestroyBombIfStillPresent(bomb, bombPos);
 
         explodingBombs.Remove(bomb);
