@@ -1,10 +1,9 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Zenject;
 
-public class GameBoard
+public class GameBoard : IGameBoard
 {
     private enum MatchDirection
     {
@@ -21,7 +20,6 @@ public class GameBoard
     public int Width => width;
 
     private SC_Gem[,] allGems;
-    //  public Gem[,] AllGems { get { return allGems; } }
 
     public int Score { get; set; }
 
@@ -57,7 +55,6 @@ public class GameBoard
         if (!IsValidBoardPosition(_PositionToCheck.x, _PositionToCheck.y))
             return false;
 
-        // Check horizontal match (left side)
         if (_PositionToCheck.x > 1)
         {
             SC_Gem left1 = GetGem(_PositionToCheck.x - 1, _PositionToCheck.y);
@@ -67,7 +64,6 @@ public class GameBoard
                 return true;
         }
 
-        // Check vertical match (below)
         if (_PositionToCheck.y > 1)
         {
             SC_Gem below1 = GetGem(_PositionToCheck.x, _PositionToCheck.y - 1);
@@ -85,20 +81,14 @@ public class GameBoard
         if (!IsValidBoardPosition(_X, _Y))
             return;
 
-        // Remove old gem from active gems if it exists
         SC_Gem oldGem = allGems[_X, _Y];
         if (oldGem && oldGem != gem)
-        {
             activeGems.Remove(oldGem);
-        }
 
         allGems[_X, _Y] = gem;
 
-        // Add new gem to active gems
         if (gem)
-        {
             activeGems.Add(gem);
-        }
     }
 
     public SC_Gem GetGem(int _X, int _Y)
@@ -114,11 +104,11 @@ public class GameBoard
         return x >= 0 && x < width && y >= 0 && y < height;
     }
 
-    private BombLogicService bombLogicService;
+    private IBombHandler bombHandler;
 
-    public void SetBombLogicService(BombLogicService service)
+    public void SetBombHandler(IBombHandler handler)
     {
-        bombLogicService = service;
+        bombHandler = handler;
     }
 
     public void FindAllMatches()
@@ -140,8 +130,7 @@ public class GameBoard
         if (currentMatches.Count > 0)
             currentMatches = currentMatches.Distinct().ToList();
 
-        // Also check for bomb-to-bomb matches (any color bombs match with each other)
-        if (bombLogicService != null)
+        if (bombHandler != null)
         {
             for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
@@ -149,7 +138,7 @@ public class GameBoard
                 SC_Gem currentGem = allGems[x, y];
                 if (currentGem && currentGem.type == GlobalEnums.GemType.bomb)
                 {
-                    bombLogicService.CheckBombToBombMatch(x, y, currentGem, currentMatches);
+                    bombHandler.CheckBombToBombMatch(x, y, currentGem, currentMatches);
                 }
             }
         }
@@ -162,13 +151,12 @@ public class GameBoard
     
     private GlobalEnums.GemType GetGemColorForMatch(SC_Gem gem)
     {
-        if (bombLogicService != null)
+        if (bombHandler != null)
         {
-            return bombLogicService.GetGemColorForMatch(gem);
+            return bombHandler.GetGemColorForMatch(gem);
         }
 
-        // Fallback to original logic if service not available
-        if (gem == null)
+        if (!gem)
             return GlobalEnums.GemType.blue;
 
         return gem.type == GlobalEnums.GemType.bomb ? gem.GemColor : gem.type;
@@ -176,7 +164,7 @@ public class GameBoard
     
     private void CheckBombMatch(int x, int y, SC_Gem bombGem)
     {
-        bombLogicService?.CheckBombMatch(x, y, bombGem, currentMatches);
+        bombHandler?.CheckBombMatch(x, y, bombGem, currentMatches);
     }
 
     private void CheckHorizontalMatch(int x, int y, SC_Gem currentGem)
@@ -191,7 +179,7 @@ public class GameBoard
     
     private void CheckMatchInDirection(int x, int y, SC_Gem currentGem, MatchDirection direction)
     {
-        if (currentGem == null)
+        if (!currentGem)
             return;
 
         const int MIN_MATCH_COUNT = 3;
@@ -300,7 +288,7 @@ public class GameBoard
 
     private void CheckForBombs()
     {
-        if (bombLogicService == null)
+        if (bombHandler == null)
             return;
 
         for (int x = 0; x < width; x++)
@@ -314,17 +302,6 @@ public class GameBoard
                 }
             }
         }
-    }
-
-    public List<Vector2Int> GetBombExplosionPattern(Vector2Int bombPos)
-    {
-        if (bombLogicService != null)
-        {
-            return bombLogicService.GetBombExplosionPattern(bombPos);
-        }
-
-        // Fallback to empty list if service not available
-        return new List<Vector2Int>();
     }
     
     public class Factory : PlaceholderFactory<int, int, GameBoard>

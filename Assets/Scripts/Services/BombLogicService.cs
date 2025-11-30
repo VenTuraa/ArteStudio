@@ -1,10 +1,9 @@
-using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Zenject;
 
-public class BombLogicService
+public class BombLogicService : IBombHandler
 {
     private const int MIN_SAME_COLOR_COUNT_FOR_BOMB_MATCH = 2;
     private const int MIN_REGULAR_COUNT_FOR_NEW_BOMB = 3;
@@ -20,30 +19,31 @@ public class BombLogicService
         { GlobalEnums.GemType.purple, new Color(0.5f, 0f, 0.5f) }
     };
 
-    private readonly GameBoard gameBoard;
+    private readonly IGameBoard gameBoard;
     private readonly SC_GameVariables gameVariables;
-    private Action<SC_Gem> onScoreAdd;
-    private Action<Vector2Int, Func<SC_Gem, bool>> onDestroyGem;
-    private Action onExplosionsComplete;
-    private Func<Vector2Int, GlobalEnums.GemType, SC_Gem> onCreateBomb;
+    private readonly IScoreService scoreService;
+    private readonly IGemDestroyer gemDestroyer;
+    private readonly IGemSpawnerService gemSpawner;
+    private ICascadeService cascadeService;
 
-    public BombLogicService(GameBoard gameBoard, SC_GameVariables gameVariables)
+    public void SetCascadeService(ICascadeService cascadeService)
+    {
+        this.cascadeService = cascadeService ?? throw new System.ArgumentNullException(nameof(cascadeService));
+    }
+
+    [Inject]
+    public BombLogicService(
+        IGameBoard gameBoard,
+        SC_GameVariables gameVariables,
+        IScoreService scoreService,
+        IGemDestroyer gemDestroyer,
+        IGemSpawnerService gemSpawner)
     {
         this.gameBoard = gameBoard ?? throw new System.ArgumentNullException(nameof(gameBoard));
         this.gameVariables = gameVariables ?? throw new System.ArgumentNullException(nameof(gameVariables));
-    }
-    
-    public class Factory : PlaceholderFactory<GameBoard, BombLogicService>
-    {
-    }
-
-    public void SetCallbacks(Action<SC_Gem> scoreCallback, Action<Vector2Int, Func<SC_Gem, bool>> destroyCallback,
-        Action completeCallback, Func<Vector2Int, GlobalEnums.GemType, SC_Gem> createBombCallback)
-    {
-        onScoreAdd = scoreCallback;
-        onDestroyGem = destroyCallback;
-        onExplosionsComplete = completeCallback;
-        onCreateBomb = createBombCallback;
+        this.scoreService = scoreService ?? throw new System.ArgumentNullException(nameof(scoreService));
+        this.gemDestroyer = gemDestroyer ?? throw new System.ArgumentNullException(nameof(gemDestroyer));
+        this.gemSpawner = gemSpawner ?? throw new System.ArgumentNullException(nameof(gemSpawner));
     }
 
     public void CheckBombMatch(int x, int y, SC_Gem bombGem, List<SC_Gem> currentMatches)
@@ -95,12 +95,7 @@ public class BombLogicService
         if (gem == null)
             return GlobalEnums.GemType.blue;
 
-        if (gem.type == GlobalEnums.GemType.bomb)
-        {
-            return gem.GemColor;
-        }
-
-        return gem.type;
+        return gem.type == GlobalEnums.GemType.bomb ? gem.GemColor : gem.type;
     }
 
     public List<Vector2Int> GetBombExplosionPattern(Vector2Int bombPos)
@@ -115,7 +110,7 @@ public class BombLogicService
 
     public void ApplyBombColor(SC_Gem bomb, GlobalEnums.GemType gemType)
     {
-        if (bomb == null || gemType == GlobalEnums.GemType.bomb)
+        if (!bomb || gemType == GlobalEnums.GemType.bomb)
             return;
 
         Color bombColor = BombColorMap.TryGetValue(gemType, out Color color) ? color : Color.white;
@@ -317,7 +312,10 @@ public class BombLogicService
         {
             explodingBombs.Clear();
             await UniTask.Delay(System.TimeSpan.FromSeconds(POST_EXPLOSION_DELAY));
-            onExplosionsComplete?.Invoke();
+            if (cascadeService != null)
+            {
+                cascadeService.ProcessCascade().Forget();
+            }
         }
     }
 
@@ -362,8 +360,8 @@ public class BombLogicService
                 }
                 else
                 {
-                    onScoreAdd?.Invoke(gem);
-                    onDestroyGem?.Invoke(pos, g => g.type != GlobalEnums.GemType.bomb);
+                    scoreService.AddScore(gem);
+                    gemDestroyer.DestroyGem(pos, g => g.type != GlobalEnums.GemType.bomb);
                 }
             }
         }
@@ -374,8 +372,8 @@ public class BombLogicService
         SC_Gem bombAtPos = gameBoard.GetGem(bombPos.x, bombPos.y);
         if (bombAtPos == bomb)
         {
-            onScoreAdd?.Invoke(bomb);
-            onDestroyGem?.Invoke(bombPos, g => g.type == GlobalEnums.GemType.bomb);
+            scoreService.AddScore(bomb);
+            gemDestroyer.DestroyGem(bombPos, g => g.type == GlobalEnums.GemType.bomb);
         }
     }
 
@@ -419,16 +417,17 @@ public class BombLogicService
 
     private void CreateBombAt(Vector2Int position, GlobalEnums.GemType gemType)
     {
-        if (onCreateBomb == null)
-            return;
-
         SC_Gem existingGem = gameBoard.GetGem(position.x, position.y);
         if (existingGem && existingGem.isMatch)
         {
-            onDestroyGem?.Invoke(position, g => g.type != GlobalEnums.GemType.bomb);
+            gemDestroyer.DestroyGem(position, g => g.type != GlobalEnums.GemType.bomb);
         }
 
-        SC_Gem bomb = onCreateBomb(position, gemType);
+        SC_Gem bombPrefab = gameVariables.bomb;
+        if (!bombPrefab)
+            return;
+
+        SC_Gem bomb = gemSpawner.SpawnGem(position, bombPrefab);
         if (bomb)
         {
             bomb.type = GlobalEnums.GemType.bomb;

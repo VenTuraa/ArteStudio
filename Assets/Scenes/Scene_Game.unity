@@ -352,6 +352,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   poolParent: {fileID: 1901915645}
+  scoreText: {fileID: 786657519}
+  gemsHolder: {fileID: 1740955909}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -917,6 +919,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameVariables: {fileID: 1445334647}
+  gemsHolder: {fileID: 1740955909}
 --- !u!114 &1185474011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1018,14 +1021,10 @@ MonoBehaviour:
   - {fileID: 3416069867743778491, guid: 93bd623174244c047af9ce43cc254c32, type: 3}
   - {fileID: 8289337781777951430, guid: 473855e3d0d3c8143836b678c9a1b8b5, type: 3}
   - {fileID: 4372168081761593873, guid: 91ba2370328500d4db689dad894b1602, type: 3}
-  bonusAmount: 0.5
-  bombChance: 3
   dropHeight: 1
   gemSpeed: 9
   cascadeDelay: 0.05
-  bombExplosionDelay: 2
-  bombNeighborDestroyDelay: 0.3
-  bombDestroyDelay: 0.5
+  bombExplosionDelay: 1
   scoreSpeed: 5
   rowsSize: 7
   colsSize: 7

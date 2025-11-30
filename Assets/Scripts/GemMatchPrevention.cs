@@ -23,7 +23,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
         return GetMinimumMatchGem(gameBoard, position, availableGems);
     }
 
-    // When matches are unavoidable, selects the gem type that creates the minimum number of matches.
     private SC_Gem GetMinimumMatchGem(GameBoard gameBoard, Vector2Int position, SC_Gem[] availableGems)
     {
         var minMatchCount = int.MaxValue;
@@ -64,7 +63,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
     {
         GlobalEnums.GemType gemType = gemPrefab.type;
 
-        // Check left side 
         if (position.x > 1)
         {
             SC_Gem left1 = gameBoard.GetGem(position.x - 1, position.y);
@@ -73,7 +71,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
-        // Check right side 
         if (position.x < gameBoard.Width - 2)
         {
             SC_Gem right1 = gameBoard.GetGem(position.x + 1, position.y);
@@ -82,7 +79,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
-        // Check if gem would connect two groups 
         if (position.x > 0 && position.x < gameBoard.Width - 1)
         {
             SC_Gem left = gameBoard.GetGem(position.x - 1, position.y);
@@ -98,7 +94,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
     {
         GlobalEnums.GemType gemType = gemPrefab.type;
 
-        // Check below 
         if (position.y > 1)
         {
             SC_Gem below1 = gameBoard.GetGem(position.x, position.y - 1);
@@ -107,7 +102,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
-        // Check above
         if (position.y < gameBoard.Height - 2)
         {
             SC_Gem above1 = gameBoard.GetGem(position.x, position.y + 1);
@@ -116,7 +110,6 @@ public class GemMatchPrevention : IMatchPreventionStrategy
                 return true;
         }
 
-        // Check if gem would connect two groups
         if (position.y > 0 && position.y < gameBoard.Height - 1)
         {
             SC_Gem below = gameBoard.GetGem(position.x, position.y - 1);
