@@ -352,7 +352,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   poolParent: {fileID: 1901915645}
-  scoreText: {fileID: 786657519}
   gemsHolder: {fileID: 1740955909}
 --- !u!1 &519420028
 GameObject:
@@ -920,6 +919,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameVariables: {fileID: 1445334647}
   gemsHolder: {fileID: 1740955909}
+  scoreText: {fileID: 786657519}
 --- !u!114 &1185474011
 MonoBehaviour:
   m_ObjectHideFlags: 0
