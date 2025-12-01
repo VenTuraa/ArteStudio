@@ -16,7 +16,7 @@ public class CascadeService : ICascadeService
     private readonly IGemSpawnerService gemSpawner;
     private readonly IGameStateService gameStateService;
     private IMatchHandlerService matchHandler;
-    private SC_GameLogic gameLogic;
+    private IGameCoordinator gameCoordinator;
 
     private HashSet<SC_Gem> cascadeGems = new();
     private HashSet<Vector2Int> cascadePositions = new();
@@ -24,6 +24,11 @@ public class CascadeService : ICascadeService
     public void SetMatchHandler(IMatchHandlerService matchHandler)
     {
         this.matchHandler = matchHandler ?? throw new System.ArgumentNullException(nameof(matchHandler));
+    }
+
+    public void SetGameCoordinator(IGameCoordinator coordinator)
+    {
+        gameCoordinator = coordinator;
     }
 
     [Inject]
@@ -37,11 +42,6 @@ public class CascadeService : ICascadeService
         this.gameVariables = gameVariables;
         this.gemSpawner = gemSpawner;
         this.gameStateService = gameStateService;
-    }
-
-    public void SetGameLogic(SC_GameLogic logic)
-    {
-        gameLogic = logic;
     }
 
     public async UniTask ProcessCascade()
@@ -71,7 +71,7 @@ public class CascadeService : ICascadeService
                 SC_Gem gemOnBoard = gameBoard.GetGem(column, dropInfo.targetY);
                 if (gemOnBoard)
                 {
-                    Vector2Int pos = new Vector2Int(column, dropInfo.targetY);
+                    var pos = new Vector2Int(column, dropInfo.targetY);
                     cascadeGems.Add(gemOnBoard);
                     cascadePositions.Add(pos);
                     
@@ -82,7 +82,7 @@ public class CascadeService : ICascadeService
                 }
                 else
                 {
-                    Vector2Int pos = new Vector2Int(column, dropInfo.targetY);
+                    var pos = new Vector2Int(column, dropInfo.targetY);
                     cascadeGems.Add(dropInfo.gem);
                     cascadePositions.Add(pos);
                     dropInfo.gem.posIndex = pos;
@@ -134,14 +134,10 @@ public class CascadeService : ICascadeService
             if (newGem)
             {
                 if (newGem.type != GlobalEnums.GemType.bomb)
-                {
                     newGem.GemColor = newGem.type;
-                }
 
-                if (gameLogic)
-                {
+                if (gameCoordinator is SC_GameLogic gameLogic)
                     newGem.SetupGem(gameLogic, new Vector2Int(column, spawnY));
-                }
 
                 GemDropInfo newGemInfo = new GemDropInfo
                 {
@@ -179,14 +175,10 @@ public class CascadeService : ICascadeService
             gameBoard.SetGem(column, dropInfo.targetY, dropInfo.gem);
 
             if (dropInfo.sourceY < gameBoard.Height)
-            {
                 gameBoard.SetGem(column, dropInfo.sourceY, null);
-            }
 
             if (i < dropQueue.Count - 1)
-            {
                 await WaitForGemChainTrigger(dropInfo.gem, dropInfo.sourceY, STAGGER_THRESHOLD);
-            }
         }
     }
 

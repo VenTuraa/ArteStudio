@@ -21,16 +21,11 @@ public class GameBoard : IGameBoard
 
     private SC_Gem[,] allGems;
 
-    public int Score { get; set; }
+    public List<SC_Gem> CurrentMatches { get; private set; } = new();
 
-    private List<SC_Gem> currentMatches = new();
-    public List<SC_Gem> CurrentMatches => currentMatches;
+    public List<BombCreationInfo> BombsToCreate { get; } = new();
 
-    private List<BombCreationInfo> bombsToCreate = new();
-    public List<BombCreationInfo> BombsToCreate => bombsToCreate;
-
-    private HashSet<SC_Gem> activeGems = new();
-    public HashSet<SC_Gem> ActiveGems => activeGems;
+    public HashSet<SC_Gem> ActiveGems { get; } = new();
 
     public struct BombCreationInfo
     {
@@ -83,12 +78,12 @@ public class GameBoard : IGameBoard
 
         SC_Gem oldGem = allGems[_X, _Y];
         if (oldGem && oldGem != gem)
-            activeGems.Remove(oldGem);
+            ActiveGems.Remove(oldGem);
 
         allGems[_X, _Y] = gem;
 
         if (gem)
-            activeGems.Add(gem);
+            ActiveGems.Add(gem);
     }
 
     public SC_Gem GetGem(int _X, int _Y)
@@ -113,8 +108,8 @@ public class GameBoard : IGameBoard
 
     public void FindAllMatches()
     {
-        currentMatches.Clear();
-        bombsToCreate.Clear();
+        CurrentMatches.Clear();
+        BombsToCreate.Clear();
 
         for (int x = 0; x < width; x++)
         for (int y = 0; y < height; y++)
@@ -127,8 +122,8 @@ public class GameBoard : IGameBoard
             }
         }
 
-        if (currentMatches.Count > 0)
-            currentMatches = currentMatches.Distinct().ToList();
+        if (CurrentMatches.Count > 0)
+            CurrentMatches = CurrentMatches.Distinct().ToList();
 
         if (bombHandler != null)
         {
@@ -138,13 +133,13 @@ public class GameBoard : IGameBoard
                 SC_Gem currentGem = allGems[x, y];
                 if (currentGem && currentGem.type == GlobalEnums.GemType.bomb)
                 {
-                    bombHandler.CheckBombToBombMatch(x, y, currentGem, currentMatches);
+                    bombHandler.CheckBombToBombMatch(x, y, currentGem, CurrentMatches);
                 }
             }
         }
 
-        if (currentMatches.Count > 0)
-            currentMatches = currentMatches.Distinct().ToList();
+        if (CurrentMatches.Count > 0)
+            CurrentMatches = CurrentMatches.Distinct().ToList();
 
         CheckForBombs();
     }
@@ -164,7 +159,7 @@ public class GameBoard : IGameBoard
     
     private void CheckBombMatch(int x, int y, SC_Gem bombGem)
     {
-        bombHandler?.CheckBombMatch(x, y, bombGem, currentMatches);
+        bombHandler?.CheckBombMatch(x, y, bombGem, CurrentMatches);
     }
 
     private void CheckHorizontalMatch(int x, int y, SC_Gem currentGem)
@@ -266,19 +261,19 @@ public class GameBoard : IGameBoard
         foreach (SC_Gem gem in matchGroup)
         {
             gem.isMatch = true;
-            if (!currentMatches.Contains(gem))
+            if (!CurrentMatches.Contains(gem))
             {
-                currentMatches.Add(gem);
+                CurrentMatches.Add(gem);
             }
         }
     }
     
     private void TryCreateBombAtPosition(Vector2Int position, GlobalEnums.GemType gemType)
     {
-        bool alreadyExists = bombsToCreate.Any(b => b.position == position);
+        bool alreadyExists = BombsToCreate.Any(b => b.position == position);
         if (!alreadyExists)
         {
-            bombsToCreate.Add(new BombCreationInfo
+            BombsToCreate.Add(new BombCreationInfo
             {
                 position = position,
                 gemType = gemType

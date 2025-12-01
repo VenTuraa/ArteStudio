@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using Zenject;
 
@@ -5,6 +6,7 @@ public class GameInstaller : MonoInstaller
 {
     [SerializeField] private SC_GameVariables gameVariables;
     [SerializeField] private Transform gemsHolder;
+    [SerializeField] private TextMeshProUGUI scoreText;
 
     public override void InstallBindings()
     {
@@ -15,6 +17,7 @@ public class GameInstaller : MonoInstaller
         Container.Bind<IScoreService>().To<ScoreService>().AsSingle();
         Container.Bind<IGameStateService>().To<GameStateService>().AsSingle();
         Container.Bind<IMatchPreventionStrategy>().To<GemMatchPrevention>().AsSingle();
+        Container.Bind<IGameConfig>().To<GameConfigService>().AsSingle();
 
         Container.BindFactory<int, int, GameBoard, GameBoard.Factory>()
             .FromMethod((container, width, height) => new GameBoard(width, height));
@@ -28,5 +31,9 @@ public class GameInstaller : MonoInstaller
         Container.Bind<IBombHandler>().To<BombLogicService>().AsSingle();
         Container.Bind<ICascadeService>().To<CascadeService>().AsSingle();
         Container.Bind<IMatchHandlerService>().To<MatchHandlerService>().AsSingle();
+
+        Container.Bind<TextMeshProUGUI>().FromInstance(scoreText).AsSingle();
+
+        Container.Bind<UIUpdateService>().AsSingle();
     }
 }

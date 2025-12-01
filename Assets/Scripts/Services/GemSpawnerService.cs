@@ -13,7 +13,7 @@ public class GemSpawnerService : IGemSpawnerService
     private readonly SC_GameVariables gameVariables;
     private readonly IMatchPreventionStrategy matchPrevention;
     private readonly Transform gemsHolder;
-    private SC_GameLogic gameLogic;
+    private IGameCoordinator gameCoordinator;
 
     [Inject]
     public GemSpawnerService(
@@ -30,9 +30,9 @@ public class GemSpawnerService : IGemSpawnerService
         this.gemsHolder = gemsHolder;
     }
 
-    public void SetGameLogic(SC_GameLogic logic)
+    public void SetGameCoordinator(IGameCoordinator coordinator)
     {
-        gameLogic = logic;
+        gameCoordinator = coordinator;
     }
 
     public void InitializeBoard(int width, int height)
@@ -81,7 +81,7 @@ public class GemSpawnerService : IGemSpawnerService
             gem.GemColor = gem.type;
 
         gameBoard.SetGem(position.x, position.y, gem);
-        if (gameLogic)
+        if (gameCoordinator is SC_GameLogic gameLogic)
         {
             gem.SetupGem(gameLogic, position);
         }

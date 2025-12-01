@@ -34,10 +34,7 @@ public class GemPool
         if (pools[gemType].Count > 0)
         {
             gem = pools[gemType].Dequeue();
-            if (container != null)
-            {
-                container.Inject(gem);
-            }
+            container?.Inject(gem);
             gem.gameObject.SetActive(true);
             gem.transform.position = position;
             gem.transform.SetParent(parent);
@@ -45,10 +42,7 @@ public class GemPool
         else
         {
             gem = Object.Instantiate(gemPrefab, position, Quaternion.identity, parent);
-            if (container != null)
-            {
-                container.Inject(gem);
-            }
+            container?.Inject(gem);
         }
 
         return gem;

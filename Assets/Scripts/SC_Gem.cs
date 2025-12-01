@@ -30,9 +30,6 @@ public class SC_Gem : MonoBehaviour
     
     void Update()
     {
-        if (scGameLogic == null)
-            return;
-
         if (Vector2.Distance(transform.position, posIndex) > 0.01f)
         {
             Vector3 targetPosition = new Vector3(posIndex.x, posIndex.y, 0);
@@ -88,43 +85,33 @@ public class SC_Gem : MonoBehaviour
 
     private void MovePieces()
     {
-        if (scGameLogic == null)
-            return;
-
         previousPos = posIndex;
 
-        if (swipeAngle < 45 && swipeAngle > -45 && posIndex.x < gameVariables.rowsSize - 1)
+        if (swipeAngle is < 45 and > -45 && posIndex.x < gameVariables.rowsSize - 1)
         {
             otherGem = scGameLogic.GetGem(posIndex.x + 1, posIndex.y);
-            if (otherGem == null) return;
             otherGem.posIndex.x--;
             posIndex.x++;
 
         }
-        else if (swipeAngle > 45 && swipeAngle <= 135 && posIndex.y < gameVariables.colsSize - 1)
+        else if (swipeAngle is > 45 and <= 135 && posIndex.y < gameVariables.colsSize - 1)
         {
             otherGem = scGameLogic.GetGem(posIndex.x, posIndex.y + 1);
-            if (otherGem == null) return;
             otherGem.posIndex.y--;
             posIndex.y++;
         }
-        else if (swipeAngle < -45 && swipeAngle >= -135 && posIndex.y > 0)
+        else if (swipeAngle is < -45 and >= -135 && posIndex.y > 0)
         {
             otherGem = scGameLogic.GetGem(posIndex.x, posIndex.y - 1);
-            if (otherGem == null) return;
             otherGem.posIndex.y++;
             posIndex.y--;
         }
         else if (swipeAngle > 135 || swipeAngle < -135 && posIndex.x > 0)
         {
             otherGem = scGameLogic.GetGem(posIndex.x - 1, posIndex.y);
-            if (otherGem == null) return;
             otherGem.posIndex.x++;
             posIndex.x--;
         }
-
-        if (otherGem == null)
-            return;
 
         scGameLogic.SetGem(posIndex.x,posIndex.y, this);
         scGameLogic.SetGem(otherGem.posIndex.x, otherGem.posIndex.y, otherGem);
@@ -134,15 +121,12 @@ public class SC_Gem : MonoBehaviour
 
     private async UniTask CheckMoveCo()
     {
-        if (scGameLogic == null)
-            return;
-
         scGameLogic.SetState(GlobalEnums.GameState.wait);
 
         await UniTask.Delay(System.TimeSpan.FromSeconds(0.5f));
         scGameLogic.FindAllMatches();
 
-        if (otherGem != null)
+        if (otherGem)
         {
             if (isMatch == false && otherGem.isMatch == false)
             {

@@ -12,4 +12,5 @@ public interface IBombHandler
     UniTask HandleBombExplosions(List<SC_Gem> bombs, HashSet<SC_Gem> explodingBombs);
     HashSet<Vector2Int> CreateBombsFromMatches();
     void RemoveNewBombsFromMatches(HashSet<Vector2Int> newBombPositions, List<SC_Gem> currentMatches);
+    void SetCascadeService(ICascadeService cascadeService);
 }

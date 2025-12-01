@@ -5,7 +5,6 @@ public interface IGameBoard
 {
     int Width { get; }
     int Height { get; }
-    int Score { get; set; }
     List<SC_Gem> CurrentMatches { get; }
     HashSet<SC_Gem> ActiveGems { get; }
     List<GameBoard.BombCreationInfo> BombsToCreate { get; }
@@ -14,4 +13,5 @@ public interface IGameBoard
     SC_Gem GetGem(int x, int y);
     bool MatchesAt(Vector2Int position, SC_Gem gemToCheck);
     void FindAllMatches();
+    void SetBombHandler(IBombHandler handler);
 }
