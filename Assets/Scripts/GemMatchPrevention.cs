@@ -17,10 +17,80 @@ public class GemMatchPrevention : IMatchPreventionStrategy
 
         if (safeGems.Count > 0)
         {
+            var bestSafeGems = safeGems.Where(gemPrefab => !HasPotentialMatchWithNeighbors(gameBoard, position, gemPrefab)).ToList();
+            
+            if (bestSafeGems.Count > 0)
+            {
+                return bestSafeGems[Random.Range(0, bestSafeGems.Count)];
+            }
+            
             return safeGems[Random.Range(0, safeGems.Count)];
         }
         
         return GetMinimumMatchGem(gameBoard, position, availableGems);
+    }
+
+    private bool HasPotentialMatchWithNeighbors(GameBoard gameBoard, Vector2Int position, SC_Gem gemPrefab)
+    {
+        GlobalEnums.GemType gemType = gemPrefab.type;
+
+        if (position.x > 0)
+        {
+            SC_Gem left = gameBoard.GetGem(position.x - 1, position.y);
+            if (left && left.type == gemType)
+            {
+                if (position.x > 1)
+                {
+                    SC_Gem left2 = gameBoard.GetGem(position.x - 2, position.y);
+                    if (left2 && left2.type == gemType)
+                        return true;
+                }
+            }
+        }
+
+        if (position.x < gameBoard.Width - 1)
+        {
+            SC_Gem right = gameBoard.GetGem(position.x + 1, position.y);
+            if (right && right.type == gemType)
+            {
+                if (position.x < gameBoard.Width - 2)
+                {
+                    SC_Gem right2 = gameBoard.GetGem(position.x + 2, position.y);
+                    if (right2 && right2.type == gemType)
+                        return true;
+                }
+            }
+        }
+
+        if (position.y > 0)
+        {
+            SC_Gem below = gameBoard.GetGem(position.x, position.y - 1);
+            if (below && below.type == gemType)
+            {
+                if (position.y > 1)
+                {
+                    SC_Gem below2 = gameBoard.GetGem(position.x, position.y - 2);
+                    if (below2 && below2.type == gemType)
+                        return true;
+                }
+            }
+        }
+
+        if (position.y < gameBoard.Height - 1)
+        {
+            SC_Gem above = gameBoard.GetGem(position.x, position.y + 1);
+            if (above && above.type == gemType)
+            {
+                if (position.y < gameBoard.Height - 2)
+                {
+                    SC_Gem above2 = gameBoard.GetGem(position.x, position.y + 2);
+                    if (above2 && above2.type == gemType)
+                        return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private SC_Gem GetMinimumMatchGem(GameBoard gameBoard, Vector2Int position, SC_Gem[] availableGems)

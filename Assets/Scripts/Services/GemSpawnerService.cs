@@ -7,7 +7,7 @@ using Random = UnityEngine.Random;
 public class GemSpawnerService : IGemSpawnerService
 {
     private const int MAX_MATCH_PREVENTION_ITERATIONS = 100;
-    
+
     private readonly IGameBoard gameBoard;
     private readonly GemPool gemPool;
     private readonly SC_GameVariables gameVariables;
@@ -100,12 +100,97 @@ public class GemSpawnerService : IGemSpawnerService
             gameVariables.gems
         );
 
+        if (!safeGem || simulatedBoard.MatchesAt(new Vector2Int(column, targetY), safeGem))
+            safeGem = GetGemWithMinimumMatches(simulatedBoard, column, targetY);
+
         if (!safeGem)
-        {
             safeGem = gameVariables.gems[Random.Range(0, gameVariables.gems.Length)];
-        }
 
         return safeGem;
+    }
+
+    private SC_Gem GetGemWithMinimumMatches(GameBoard simulatedBoard, int column, int targetY)
+    {
+        if (gameVariables == null || gameVariables.gems == null || gameVariables.gems.Length == 0)
+            return null;
+
+        int minMatchCount = int.MaxValue;
+        List<SC_Gem> bestOptions = new List<SC_Gem>();
+
+        foreach (SC_Gem gemPrefab in gameVariables.gems)
+        {
+            int matchCount = CountMatchesForGem(simulatedBoard, column, targetY, gemPrefab);
+            if (matchCount < minMatchCount)
+            {
+                minMatchCount = matchCount;
+                bestOptions.Clear();
+                bestOptions.Add(gemPrefab);
+            }
+            else if (matchCount == minMatchCount)
+            {
+                bestOptions.Add(gemPrefab);
+            }
+        }
+
+        return bestOptions.Count > 0 ? bestOptions[Random.Range(0, bestOptions.Count)] : gameVariables.gems[0];
+    }
+
+    private int CountMatchesForGem(GameBoard simulatedBoard, int column, int targetY, SC_Gem gemPrefab)
+    {
+        int matchCount = 0;
+        GlobalEnums.GemType gemType = gemPrefab.type;
+
+        // Check horizontal matches
+        int horizontalCount = 1; // Count the gem itself
+        // Check left
+        for (int x = column - 1; x >= 0; x--)
+        {
+            SC_Gem gem = simulatedBoard.GetGem(x, targetY);
+            if (gem && gem.type == gemType)
+                horizontalCount++;
+            else
+                break;
+        }
+
+        // Check right
+        for (int x = column + 1; x < simulatedBoard.Width; x++)
+        {
+            SC_Gem gem = simulatedBoard.GetGem(x, targetY);
+            if (gem && gem.type == gemType)
+                horizontalCount++;
+            else
+                break;
+        }
+
+        if (horizontalCount >= 3)
+            matchCount++;
+
+        // Check vertical matches
+        int verticalCount = 1; // Count the gem itself
+        // Check below
+        for (int y = targetY - 1; y >= 0; y--)
+        {
+            SC_Gem gem = simulatedBoard.GetGem(column, y);
+            if (gem && gem.type == gemType)
+                verticalCount++;
+            else
+                break;
+        }
+
+        // Check above
+        for (int y = targetY + 1; y < simulatedBoard.Height; y++)
+        {
+            SC_Gem gem = simulatedBoard.GetGem(column, y);
+            if (gem && gem.type == gemType)
+                verticalCount++;
+            else
+                break;
+        }
+
+        if (verticalCount >= 3)
+            matchCount++;
+
+        return matchCount;
     }
 
     private GameBoard CreateSimulatedBoardState(int column, int targetY, List<GemDropInfo> existingDropQueue,
@@ -115,15 +200,23 @@ public class GemSpawnerService : IGemSpawnerService
         Dictionary<int, SC_Gem> targetPositionToGem = BuildTargetPositionMap(existingDropQueue, newGemsQueue);
         HashSet<SC_Gem> fallingGems = GetFallingGemsSet(existingDropQueue);
 
+        // First, copy all gems from the current board state
         for (int x = 0; x < gameBoard.Width; x++)
         {
             for (int y = 0; y < gameBoard.Height; y++)
             {
-                SC_Gem gemToPlace = x == column
-                    ? GetGemForSimulatedPosition(column, y, targetPositionToGem, fallingGems)
-                    : gameBoard.GetGem(x, y);
-
-                simulatedBoard.SetGem(x, y, gemToPlace);
+                if (x == column)
+                {
+                    // For the column being processed, use the simulated position logic
+                    SC_Gem gemToPlace = GetGemForSimulatedPosition(column, y, targetPositionToGem, fallingGems);
+                    simulatedBoard.SetGem(x, y, gemToPlace);
+                }
+                else
+                {
+                    // For other columns, use the current board state
+                    SC_Gem existingGem = gameBoard.GetGem(x, y);
+                    simulatedBoard.SetGem(x, y, existingGem);
+                }
             }
         }
 
