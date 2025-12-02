@@ -200,20 +200,17 @@ public class GemSpawnerService : IGemSpawnerService
         Dictionary<int, SC_Gem> targetPositionToGem = BuildTargetPositionMap(existingDropQueue, newGemsQueue);
         HashSet<SC_Gem> fallingGems = GetFallingGemsSet(existingDropQueue);
 
-        // First, copy all gems from the current board state
         for (int x = 0; x < gameBoard.Width; x++)
         {
             for (int y = 0; y < gameBoard.Height; y++)
             {
                 if (x == column)
                 {
-                    // For the column being processed, use the simulated position logic
                     SC_Gem gemToPlace = GetGemForSimulatedPosition(column, y, targetPositionToGem, fallingGems);
                     simulatedBoard.SetGem(x, y, gemToPlace);
                 }
                 else
                 {
-                    // For other columns, use the current board state
                     SC_Gem existingGem = gameBoard.GetGem(x, y);
                     simulatedBoard.SetGem(x, y, existingGem);
                 }

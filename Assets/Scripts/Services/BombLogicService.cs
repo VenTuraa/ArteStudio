@@ -418,6 +418,10 @@ public class BombLogicService : IBombHandler
     private void CreateBombAt(Vector2Int position, GlobalEnums.GemType gemType)
     {
         SC_Gem existingGem = gameBoard.GetGem(position.x, position.y);
+        
+        if (existingGem && existingGem.type == GlobalEnums.GemType.bomb)
+            return;
+        
         if (existingGem && existingGem.isMatch)
         {
             gemDestroyer.DestroyGem(position, g => g.type != GlobalEnums.GemType.bomb);
@@ -440,7 +444,6 @@ public class BombLogicService : IBombHandler
             }
 
             ApplyBombColor(bomb, gemType);
-            gameBoard.SetGem(position.x, position.y, bomb);
         }
     }
 }
